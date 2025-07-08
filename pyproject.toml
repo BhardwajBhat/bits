@@ -1,0 +1,13 @@
+[project]
+name = "bits"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "raylib>=5.5.0.2",
+]
+
+[tool.pyright]
+venv = ".venv"
+venvPath = "."
