@@ -30,7 +30,13 @@ class Ball:
             self.speed_y *= -1
 
     def draw(self):
-        rl.draw_circle(self.x, self.y, self.radius, rl.RED)
+        rl.draw_texture_ex(
+            ball_texture,
+            (self.x - 22, self.y - 22),
+            0,
+            0.08,
+            rl.WHITE,
+        )
 
 
 class Paddle:
@@ -68,6 +74,8 @@ class Brick:
 
 rl.init_window(SCREEN_WIDTH, SCREEN_HEIGHT, "Breakout with Raylib")
 rl.set_target_fps(60)
+
+ball_texture = rl.load_texture("./data/heart.png")
 
 ball = Ball()
 paddle = Paddle()
@@ -111,4 +119,5 @@ while not rl.window_should_close():
 
     rl.end_drawing()
 
+rl.unload_texture(ball_texture)
 rl.close_window()
