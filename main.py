@@ -1,123 +1,89 @@
+from typing import Dict, Callable, List
 import pyray as rl
 
-SCREEN_WIDTH = 800
-SCREEN_HEIGHT = 600
-PADDLE_WIDTH = 100
-PADDLE_HEIGHT = 20
-BALL_RADIUS = 10
-BRICK_ROWS = 5
-BRICK_COLUMNS = 10
-BRICK_WIDTH = 70
-BRICK_HEIGHT = 20
-BRICK_SPACING = 10
+
+class CPU:
+    def __init__(self, program: List[str]) -> None:
+        self.registers: Dict[str, int] = {f"R{i}": 0 for i in range(4)}
+        self.pc: int = 0
+        self.program: List[str] = program
+        self.instructions: Dict[str, Callable[[str, str], None]] = {
+            "ADD": self.op_add,
+            "SUB": self.op_sub,
+        }
+
+    def get_value(self, operand: str) -> int:
+        if operand in self.registers:
+            return self.registers[operand]
+        return int(operand)
+
+    def execute_instruction(self, line: str):
+        print(f"Executing: {line}")
+        try:
+            op, dest, src = line.strip().split()
+            if op not in self.instructions:
+                raise ValueError(f"Unknown opcode: {op}")
+            if dest not in self.registers:
+                raise ValueError(f"Invalid register: {dest}")
+
+            self.instructions[op](dest, src)
+            self.print_registers()
+        except Exception as e:
+            print(f"Error: {e}")
+
+    def op_add(self, dest: str, src: str) -> None:
+        self.registers[dest] += self.get_value(src)
+
+    def op_sub(self, dest: str, src: str) -> None:
+        self.registers[dest] -= self.get_value(src)
+
+    def print_registers(self) -> None:
+        print("  ".join(f"{reg}={val}" for reg, val in self.registers.items()))
 
 
-class Ball:
-    def __init__(self):
-        self.x = SCREEN_WIDTH // 2
-        self.y = SCREEN_HEIGHT // 2
-        self.radius = BALL_RADIUS
-        self.speed_x = 5
-        self.speed_y = -5
+def draw_cpu(cpu: CPU) -> None:
+    rl.draw_text("CPU Registers:", 20, 20, 20, rl.WHITE)
+    y = 50
+    for reg, val in cpu.registers.items():
+        rl.draw_text(f"{reg}: {val}", 20, y, 20, rl.YELLOW)
+        y += 30
 
-    def update(self):
-        self.x += self.speed_x
-        self.y += self.speed_y
+    rl.draw_text("Instructions:", 20, 200, 20, rl.WHITE)
+    for idx, line in enumerate(cpu.program):
+        if cpu.pc == idx:
+            color = rl.RED
+        else:
+            color = rl.WHITE
 
-        if self.x <= self.radius or self.x >= SCREEN_WIDTH - self.radius:
-            self.speed_x *= -1
-        if self.y <= self.radius:
-            self.speed_y *= -1
-
-    def draw(self):
-        rl.draw_texture_ex(
-            ball_texture,
-            (self.x - 22, self.y - 22),
-            0,
-            0.08,
-            rl.WHITE,
-        )
+        rl.draw_text(line, 20, 230 + idx * 30, 20, color)
 
 
-class Paddle:
-    def __init__(self):
-        self.width = PADDLE_WIDTH
-        self.height = PADDLE_HEIGHT
-        self.x = (SCREEN_WIDTH - self.width) // 2
-        self.y = SCREEN_HEIGHT - 40
-        self.speed = 8
+def main() -> None:
+    program: List[str] = [
+        "ADD R1 10",
+        "ADD R2 20",
+        "ADD R1 R2",
+    ]
 
-    def update(self):
-        if rl.is_key_down(rl.KeyboardKey.KEY_LEFT):
-            self.x -= self.speed
-        if rl.is_key_down(rl.KeyboardKey.KEY_RIGHT):
-            self.x += self.speed
+    cpu = CPU(program)
 
-        self.x = max(0, min(self.x, SCREEN_WIDTH - self.width))
+    rl.init_window(720, 720, "dumb")
+    rl.set_target_fps(30)
 
-    def draw(self):
-        rl.draw_rectangle(self.x, self.y, self.width, self.height, rl.BLUE)
+    while not rl.window_should_close():
+        rl.begin_drawing()
+        rl.clear_background(rl.BLACK)
 
-    def get_rect(self):
-        return rl.Rectangle(self.x, self.y, self.width, self.height)
+        draw_cpu(cpu)
 
+        if cpu.pc < len(program) and rl.is_key_pressed(rl.KeyboardKey.KEY_SPACE):
+            cpu.execute_instruction(program[cpu.pc])
+            cpu.pc += 1
 
-class Brick:
-    def __init__(self, x, y):
-        self.rect = rl.Rectangle(x, y, BRICK_WIDTH, BRICK_HEIGHT)
-        self.destroyed = False
+        rl.end_drawing()
 
-    def draw(self):
-        if not self.destroyed:
-            rl.draw_rectangle_rec(self.rect, rl.DARKGREEN)
+    rl.close_window()
 
 
-rl.init_window(SCREEN_WIDTH, SCREEN_HEIGHT, "Breakout with Raylib")
-rl.set_target_fps(60)
-
-ball_texture = rl.load_texture("./data/heart.png")
-
-ball = Ball()
-paddle = Paddle()
-
-bricks = []
-for row in range(BRICK_ROWS):
-    for col in range(BRICK_COLUMNS):
-        x = col * (BRICK_WIDTH + BRICK_SPACING) + 35
-        y = row * (BRICK_HEIGHT + BRICK_SPACING) + 50
-        bricks.append(Brick(x, y))
-
-while not rl.window_should_close():
-    ball.update()
-    paddle.update()
-
-    if rl.check_collision_circle_rec((ball.x, ball.y), ball.radius, paddle.get_rect()):
-        ball.speed_y *= -1
-        ball.y = paddle.y - ball.radius
-
-    for brick in bricks:
-        if not brick.destroyed and rl.check_collision_circle_rec(
-            (ball.x, ball.y), ball.radius, brick.rect
-        ):
-            brick.destroyed = True
-            ball.speed_y *= -1
-            break
-
-    if ball.y > SCREEN_HEIGHT:
-        ball = Ball()
-
-    rl.begin_drawing()
-    rl.clear_background(rl.RAYWHITE)
-
-    ball.draw()
-    paddle.draw()
-    for brick in bricks:
-        brick.draw()
-
-    score = sum(brick.destroyed for brick in bricks)
-    rl.draw_text(f"Score: {score}", 10, 10, 20, rl.DARKGRAY)
-
-    rl.end_drawing()
-
-rl.unload_texture(ball_texture)
-rl.close_window()
+if __name__ == "__main__":
+    main()
